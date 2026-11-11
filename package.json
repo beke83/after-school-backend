@@ -1,0 +1,19 @@
+{
+  "name": "after-school-backend",
+  "version": "1.0.0",
+  "description": "Express.js REST API for the CST3144 after-school lessons app (MongoDB Atlas, native driver).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "mongodb": "^7.8.0"
+  }
+}
