@@ -8,6 +8,9 @@ require('dotenv').config();
 // Express is the web framework that handles HTTP requests and responses.
 const express = require('express');
 
+// Our own database helper (db.js): connectDB() opens the MongoDB connection.
+const { connectDB } = require('./db');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
@@ -58,6 +61,22 @@ app.get('/', function (req, res) {
 // On my own computer it falls back to 3000.
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, function () {
-  console.log('Server listening on port ' + PORT);
-});
+// Connect to MongoDB FIRST, and only start listening once that works.
+// Otherwise the server could accept requests while it has no database to answer them.
+async function startServer() {
+  try {
+    await connectDB();
+    console.log('Connected to MongoDB');
+
+    app.listen(PORT, function () {
+      console.log('Server listening on port ' + PORT);
+    });
+  } catch (err) {
+    // Connection failed (wrong URI, wrong password, IP not allowed in Atlas...).
+    // Show why, and stop the process with exit code 1 (= "failed").
+    console.error('Could not connect to MongoDB:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
