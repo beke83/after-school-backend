@@ -11,8 +11,18 @@ const express = require('express');
 // Our own database helper (db.js): connectDB() opens the MongoDB connection.
 const { connectDB } = require('./db');
 
+// Our own logger middleware: prints one line per request (method, URL, status, time).
+const logger = require('./middleware/logger');
+
+// Our lessons routes (routes/lessons.js), e.g. GET /lessons.
+const lessonsRouter = require('./routes/lessons');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
+
+// Middleware runs in the order it is added, so the logger goes FIRST.
+// That way every request is logged — including CORS preflights and 404s.
+app.use(logger);
 
 // Built-in middleware: reads a JSON request body (e.g. from POST /orders)
 // and puts it into req.body as a normal JavaScript object.
@@ -52,6 +62,9 @@ app.use(function (req, res, next) {
 app.get('/', function (req, res) {
   res.json({ message: 'After School API running' });
 });
+
+// Mount the lessons router: every URL starting with /lessons goes to routes/lessons.js.
+app.use('/lessons', lessonsRouter);
 
 // ---------------------------------------------------------------------------
 // Start the server
