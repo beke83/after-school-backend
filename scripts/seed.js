@@ -1,6 +1,6 @@
-// scripts/seed.js — fills the database with the 12 starting lessons.
+// scripts/seed.js — fills the database with the 12 starting lessons and 4 teachers.
 // Run it with "npm run seed" (or "node scripts/seed.js") from the backend folder.
-// WARNING: it deletes all existing lessons first, so every run starts fresh.
+// WARNING: it deletes all existing lessons and teachers first, so every run starts fresh.
 
 // path builds file paths that work on Windows, Mac and Linux.
 const path = require('path');
@@ -39,6 +39,18 @@ const lessons = [
   { topic: 'Robotics', location: 'Edgware',       price: 125, space: 5, icon: 'fa-solid fa-robot',           image: 'robotics.png' }
 ];
 
+// The 4 teachers. "lessons" lists POSITIONS in the lessons array above
+// (0 = Maths, 1 = English, ... 11 = Robotics). We can't write the real _ids here,
+// because MongoDB only creates them when the lessons are inserted, and they are
+// different on every run. After inserting, we swap each position for the real _id.
+// Every lesson 0-11 appears at least once, so every lesson has a teacher.
+const teachers = [
+  { firstName: 'Sarah', lastName: 'Ahmed',  lessons: [0, 4, 5, 11] }, // Maths, Coding, Science, Robotics
+  { firstName: 'James', lastName: 'Okafor', lessons: [1, 8, 10] },    // English, Drama, French
+  { firstName: 'Priya', lastName: 'Patel',  lessons: [2, 3, 6] },     // Music, Art, Chess
+  { firstName: 'Tom',   lastName: 'Wilson', lessons: [7, 9] }         // Football, Swimming
+];
+
 async function seed() {
   try {
     const db = await connectDB();
@@ -52,7 +64,22 @@ async function seed() {
     const inserted = await db.collection('lessons').insertMany(lessons);
     console.log('Inserted ' + inserted.insertedCount + ' lessons');
 
-    // 3. Make sure an "orders" collection exists (empty for now).
+    // 3. Reset the teachers too, so they never point at old lessons that were just deleted.
+    await db.collection('teachers').deleteMany({});
+
+    // insertedIds holds the new _ids by position: { 0: ObjectId(...), 1: ObjectId(...), ... }
+    // So inserted.insertedIds[0] is the _id of the first lesson (Maths), and so on.
+    // For each teacher, turn the list of positions into a list of real lesson _ids.
+    const teacherDocs = teachers.map(t => ({
+      firstName: t.firstName,
+      lastName: t.lastName,
+      lessonIDs: t.lessons.map(i => inserted.insertedIds[i]) // position → ObjectId
+    }));
+
+    const insertedTeachers = await db.collection('teachers').insertMany(teacherDocs);
+    console.log('Inserted ' + insertedTeachers.insertedCount + ' teachers');
+
+    // 4. Make sure an "orders" collection exists (empty for now).
     //    listCollections finds collections by name; if none is found, create it.
     //    (Orders are never deleted here — only lessons are reset.)
     const found = await db.listCollections({ name: 'orders' }).toArray();
