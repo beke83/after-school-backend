@@ -17,6 +17,9 @@ const logger = require('./middleware/logger');
 // Our lessons routes (routes/lessons.js), e.g. GET /lessons.
 const lessonsRouter = require('./routes/lessons');
 
+// Our orders routes (routes/orders.js), e.g. POST /orders.
+const ordersRouter = require('./routes/orders');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
@@ -65,6 +68,9 @@ app.get('/', function (req, res) {
 
 // Mount the lessons router: every URL starting with /lessons goes to routes/lessons.js.
 app.use('/lessons', lessonsRouter);
+
+// Mount the orders router: every URL starting with /orders goes to routes/orders.js.
+app.use('/orders', ordersRouter);
 
 // ---------------------------------------------------------------------------
 // Start the server
