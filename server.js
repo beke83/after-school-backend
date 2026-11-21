@@ -26,16 +26,15 @@ const searchRouter = require('./routes/search');
 // Our teachers routes (routes/teachers.js), e.g. GET /teachers.
 const teachersRouter = require('./routes/teachers');
 
+// Our enrolment route (routes/enrolment.js), e.g. GET /enrolment/<lesson _id>.
+const enrolmentRouter = require('./routes/enrolment');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
 // Middleware runs in the order it is added, so the logger goes FIRST.
 // That way every request is logged — including CORS preflights and 404s.
 app.use(logger);
-
-// Built-in middleware: reads a JSON request body (e.g. from POST /orders)
-// and puts it into req.body as a normal JavaScript object.
-app.use(express.json());
 
 // ---------------------------------------------------------------------------
 // CORS middleware (hand-written, no "cors" package)
@@ -63,6 +62,13 @@ app.use(function (req, res, next) {
   next();
 });
 
+// Built-in middleware: reads a JSON request body (e.g. from POST /orders)
+// and puts it into req.body as a normal JavaScript object.
+// It comes AFTER the CORS middleware on purpose: if the body is broken JSON,
+// express.json() stops with a 400 error. The CORS headers must already be set by
+// then, otherwise the browser hides the 400 and shows a CORS error instead.
+app.use(express.json());
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -83,6 +89,34 @@ app.use('/search', searchRouter);
 
 // Mount the teachers router: every URL starting with /teachers goes to routes/teachers.js.
 app.use('/teachers', teachersRouter);
+
+// Mount the enrolment router: every URL starting with /enrolment goes to routes/enrolment.js.
+app.use('/enrolment', enrolmentRouter);
+
+// ---------------------------------------------------------------------------
+// 404 and error handling — these MUST come after all the routes
+// ---------------------------------------------------------------------------
+
+// Catch-all 404: Express checks the routes above in order. If none of them
+// matched the URL, the request falls through to here, so the route doesn't exist.
+// (No path is given, so this runs for any method and any URL.)
+app.use(function (req, res) {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Error-handling middleware: Express knows it is the error handler because it has
+// FOUR parameters (err, req, res, next). It runs when something calls next(err) or
+// throws an error, for example when the browser sends broken JSON to express.json().
+// "next" isn't used, but it must be listed or Express won't treat this as an error handler.
+app.use(function (err, req, res, next) {
+  // Log the full error in the terminal / Render's Logs tab so I can see what went wrong.
+  console.error('Error:', err);
+
+  // Some errors carry their own status code (broken JSON = 400 Bad Request).
+  // Anything else is an unexpected problem on the server: 500 Internal Server Error.
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || 'Internal server error' });
+});
 
 // ---------------------------------------------------------------------------
 // Start the server
