@@ -20,6 +20,9 @@ const lessonsRouter = require('./routes/lessons');
 // Our orders routes (routes/orders.js), e.g. POST /orders.
 const ordersRouter = require('./routes/orders');
 
+// Our search route (routes/search.js), e.g. GET /search?q=math.
+const searchRouter = require('./routes/search');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
@@ -71,6 +74,9 @@ app.use('/lessons', lessonsRouter);
 
 // Mount the orders router: every URL starting with /orders goes to routes/orders.js.
 app.use('/orders', ordersRouter);
+
+// Mount the search router: every URL starting with /search goes to routes/search.js.
+app.use('/search', searchRouter);
 
 // ---------------------------------------------------------------------------
 // Start the server
