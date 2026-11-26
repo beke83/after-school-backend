@@ -29,6 +29,9 @@ const teachersRouter = require('./routes/teachers');
 // Our enrolment route (routes/enrolment.js), e.g. GET /enrolment/<lesson _id>.
 const enrolmentRouter = require('./routes/enrolment');
 
+// Our sign-up / verification routes (routes/auth.js), e.g. POST /auth/signup.
+const authRouter = require('./routes/auth');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
@@ -47,9 +50,10 @@ app.use(function (req, res, next) {
   // Allow requests from any origin ("*" = everyone).
   res.setHeader('Access-Control-Allow-Origin', '*');
   // The HTTP methods the front-end is allowed to use.
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-  // The request headers the front-end is allowed to send (needed for JSON bodies).
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  // The request headers the front-end is allowed to send:
+  // Content-Type for JSON bodies, Authorization for the login token ("Bearer ...").
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   // Before a POST or PUT with JSON, the browser first sends an OPTIONS
   // "preflight" request to ask if it is allowed. We answer with
@@ -92,6 +96,9 @@ app.use('/teachers', teachersRouter);
 
 // Mount the enrolment router: every URL starting with /enrolment goes to routes/enrolment.js.
 app.use('/enrolment', enrolmentRouter);
+
+// Mount the auth router: every URL starting with /auth goes to routes/auth.js.
+app.use('/auth', authRouter);
 
 // ---------------------------------------------------------------------------
 // 404 and error handling — these MUST come after all the routes

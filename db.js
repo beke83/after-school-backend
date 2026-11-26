@@ -32,7 +32,31 @@ async function connectDB() {
   // Choose the database by name (e.g. "afterschool").
   // MongoDB creates it automatically the first time data is written to it.
   db = client.db(process.env.DB_NAME);
+
+  // Set up the indexes the login system relies on (see createIndexes below).
+  await createIndexes(db);
+
   return db;
+}
+
+// Creates the indexes for users, otps and sessions.
+// An index is like the index at the back of a book: MongoDB can jump straight
+// to a document instead of reading them all. Indexes can also add RULES.
+// createIndex does nothing if the index already exists, so it's safe to run
+// every time the server starts.
+async function createIndexes(db) {
+  // UNIQUE index on users.email: MongoDB refuses to insert a second user with an
+  // email that is already used, even if two sign-ups arrive at the same moment.
+  await db.collection('users').createIndex({ email: 1 }, { unique: true });
+
+  // TTL ("time to live") indexes on expiresAt.
+  // expireAfterSeconds: 0 means "delete the document as soon as the time in its
+  // expiresAt field has passed". So old one-time codes and old login sessions
+  // clean themselves up — no code of ours has to delete them.
+  // (MongoDB checks about once a minute, so a document can live up to ~60 s longer.
+  //  Our routes will still check expiresAt themselves to be exact.)
+  await db.collection('otps').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  await db.collection('sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 }
 
 // Returns the database so routes can use it, e.g. getDB().collection('lessons').
