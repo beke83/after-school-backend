@@ -6,6 +6,7 @@ const express = require('express');      // load Express
 const router = express.Router();         // a mini app that only holds routes
 const { getDB } = require('../db');      // our helper that gives us the connected database
 const { ObjectId } = require('mongodb'); // MongoDB's id type, used for the lessons' _id
+const { getUserFromToken } = require('../middleware/auth'); // reads the login token (if any)
 
 // Why validate here when the front-end already checks the form?
 // - The front-end check is for the USER: it gives instant feedback before sending.
@@ -18,6 +19,11 @@ const { ObjectId } = require('mongodb'); // MongoDB's id type, used for the less
 // The two arrays go together by position: spaces[i] is the number of spaces
 // booked for lessonIDs[i]. Example: lessonIDs ['A', 'B'], spaces [2, 1]
 // means 2 spaces in lesson A and 1 space in lesson B.
+//
+// LOGIN IS OPTIONAL HERE (guests can still order — this is a marked route).
+// So we do NOT use requireAuth. Instead, if the request happens to carry a valid
+// "Authorization: Bearer <token>", we look up the user and save their _id on the order.
+// No token, or a bad/expired token → it's simply saved as a guest order (userId: null).
 router.post('/', async (req, res) => {
     const { name, phone, lessonIDs, spaces } = req.body || {}; // take the fields out of the body
 
@@ -61,6 +67,9 @@ router.post('/', async (req, res) => {
     const lessonObjectIds = lessonIDs.map(id => new ObjectId(id));
 
     try {
+        // Logged in? getUserFromToken returns { user, token } or null (guest).
+        const login = await getUserFromToken(req);
+
         const result = await getDB()          // get the database
             .collection('orders')             // pick the "orders" collection
             .insertOne({                      // add one new document
@@ -68,6 +77,7 @@ router.post('/', async (req, res) => {
                 phone: phone,
                 lessonIDs: lessonObjectIds,   // the converted ObjectIds, not the text
                 spaces: spaces,
+                userId: login ? login.user._id : null, // the logged-in user's _id, or null for a guest
                 createdAt: new Date()         // the date and time the order was made
             });
         res.status(201).json({                // 201 = "Created"

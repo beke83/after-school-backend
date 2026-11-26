@@ -37,14 +37,15 @@ backend/
 │   ├── email.js         sendEmail through Brevo's HTTP API, plus the branded code email
 │   └── otp.js           createOtp / checkOtp: 6-digit email codes (hashed, 10 min, max 5 tries)
 ├── middleware/
-│   └── logger.js        Logs every request: [time] METHOD /url → status (ms)
+│   ├── logger.js        Logs every request: [time] METHOD /url → status (ms)
+│   └── auth.js          requireAuth (Bearer token → req.user) and requireAdmin
 ├── routes/
 │   ├── lessons.js       GET /lessons, PUT /lessons/:id
 │   ├── orders.js        POST /orders
 │   ├── search.js        GET /search?q=
 │   ├── teachers.js      GET /teachers, GET /teachers/:id/lessons
 │   ├── enrolment.js     GET /enrolment/:lessonid
-│   └── auth.js          POST /auth/signup, /auth/verify-email, /auth/resend-otp
+│   └── auth.js          Sign-up, verify, resend, login, me, logout, forgot / reset password
 ├── scripts/
 │   └── seed.js          Resets the database: 12 lessons and 4 teachers
 ├── public/images/       Lesson images
@@ -92,7 +93,7 @@ All responses are JSON. Ids are MongoDB `_id` values (24 hex characters).
 | GET | `/` | — | `{ "message": "After School API running" }` |
 | GET | `/lessons` | — | `[ { "_id": "6560f1…", "topic": "Maths", "location": "Hendon", "price": 100, "space": 5, "icon": "fa-solid fa-calculator", "image": "maths.png" }, … ]` |
 | PUT | `/lessons/:id` | Any field(s) to change, e.g. `{ "space": 3 }` | `{ "message": "Lesson updated", "modified": 1 }` |
-| POST | `/orders` | `{ "name": "Jane Doe", "phone": "07123456789", "lessonIDs": ["6560f1…", "6560f2…"], "spaces": [2, 1] }` | `201` `{ "message": "Order created", "orderId": "6561a0…" }` |
+| POST | `/orders` | `{ "name": "Jane Doe", "phone": "07123456789", "lessonIDs": ["6560f1…", "6560f2…"], "spaces": [2, 1] }`. Login is optional: send `Authorization: Bearer <token>` to link the order to your account. | `201` `{ "message": "Order created", "orderId": "6561a0…" }` |
 | GET | `/search?q=term` | — | Lessons whose topic, location, price or space contains `term` (ignores case). An empty `q` returns all lessons. `[ { "_id": "6560f1…", "topic": "Maths", … } ]` |
 | GET | `/teachers` | — | `[ { "_id": "6560f9…", "firstName": "Sarah", "lastName": "Ahmed", "lessonIDs": ["6560f1…", …] }, … ]` |
 | GET | `/teachers/:id/lessons` | — | The teacher's lessons: `[ { "_id": "6560f1…", "topic": "Maths", … }, … ]` |
@@ -100,12 +101,19 @@ All responses are JSON. Ids are MongoDB `_id` values (24 hex characters).
 | POST | `/auth/signup` | `{ "firstName": "Jane", "lastName": "Doe", "email": "jane@example.com", "password": "abcdefg1" }` | `201` `{ "message": "Account created. We sent a 6-digit code to your email.", "email": "jane@example.com" }` (`409` if the email is taken) |
 | POST | `/auth/verify-email` | `{ "email": "jane@example.com", "code": "123456" }` | `{ "message": "Email verified. You can now log in." }` |
 | POST | `/auth/resend-otp` | `{ "email": "jane@example.com", "purpose": "verify" }` (or `"reset"`) | `{ "message": "If this email needs a code, we have sent a new one." }` (`429` if asked again within 60 s) |
+| POST | `/auth/login` | `{ "email": "jane@example.com", "password": "abcdefg1" }` | `{ "token": "3f9a1c…", "user": { "_id": "…", "firstName": "Jane", "lastName": "Doe", "email": "jane@example.com", "role": "user" } }` (`401` wrong details, `403` `{ "needsVerification": true }` if the email isn't verified) |
+| GET | `/auth/me` | — (needs `Authorization: Bearer <token>`) | `{ "user": { "_id": "…", "firstName": "Jane", … } }` |
+| POST | `/auth/logout` | — (needs `Authorization: Bearer <token>`) | `{ "message": "Logged out" }` |
+| POST | `/auth/forgot-password` | `{ "email": "jane@example.com" }` | `{ "message": "If an account exists for this email, we have sent a reset code." }` |
+| POST | `/auth/reset-password` | `{ "email": "jane@example.com", "code": "123456", "newPassword": "newpass99" }` | `{ "message": "Password changed. Please log in with your new password." }` |
 
 **Errors**
 
 | Status | When | Example response |
 |---|---|---|
 | `400` | Invalid id, failed order validation, nothing to update, broken JSON | `{ "error": "Phone must contain numbers only" }` |
+| `401` | Wrong email/password, or a missing/expired token | `{ "error": "Please log in" }` |
+| `403` | Email not verified yet, or not an admin | `{ "error": "Admins only" }` |
 | `404` | No lesson/teacher with that id, or the route doesn't exist | `{ "error": "Route not found" }` |
 | `409` | Sign-up with an email that already has an account | `{ "error": "An account with this email already exists" }` |
 | `429` | A new code was asked for within 60 seconds | `{ "error": "Please wait 60 seconds before asking for another code" }` |
