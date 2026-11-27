@@ -32,6 +32,12 @@ const enrolmentRouter = require('./routes/enrolment');
 // Our sign-up / verification routes (routes/auth.js), e.g. POST /auth/signup.
 const authRouter = require('./routes/auth');
 
+// Our admin dashboard routes (routes/admin.js) — all need an admin login.
+const adminRouter = require('./routes/admin');
+
+// Our Paystack payment routes (routes/payments.js), e.g. POST /payments/initialize.
+const paymentsRouter = require('./routes/payments');
+
 // Create the Express application object. All routes and middleware are added to it.
 const app = express();
 
@@ -99,6 +105,12 @@ app.use('/enrolment', enrolmentRouter);
 
 // Mount the auth router: every URL starting with /auth goes to routes/auth.js.
 app.use('/auth', authRouter);
+
+// Mount the admin router: every URL starting with /admin goes to routes/admin.js.
+app.use('/admin', adminRouter);
+
+// Mount the payments router: every URL starting with /payments goes to routes/payments.js.
+app.use('/payments', paymentsRouter);
 
 // ---------------------------------------------------------------------------
 // 404 and error handling — these MUST come after all the routes

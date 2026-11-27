@@ -5,6 +5,18 @@
 // MongoClient is the driver's class that manages the connection to the database server.
 const { MongoClient } = require('mongodb');
 
+// dns is built into Node. A "mongodb+srv://" connection string first asks DNS for an
+// "SRV record" that lists the cluster's servers. On some Windows networks (e.g. a phone
+// hotspot) Node can't read the computer's DNS settings and falls back to 127.0.0.1,
+// where nothing answers — the error is "querySrv ECONNREFUSED".
+// So: if Node only has a local (127.x / ::1) DNS server, use public DNS servers instead
+// (Google 8.8.8.8 and Cloudflare 1.1.1.1). On Render Node has proper DNS, so nothing changes.
+const dns = require('dns');
+const onlyLocalDns = dns.getServers().every(server => server.startsWith('127.') || server === '::1');
+if (onlyLocalDns) {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
+
 // These start empty and are filled in once by connectDB().
 // Keeping them here (outside the functions) means every file that requires db.js
 // shares the SAME connection instead of opening a new one each time.
@@ -57,6 +69,15 @@ async function createIndexes(db) {
   //  Our routes will still check expiresAt themselves to be exact.)
   await db.collection('otps').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection('sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+  // UNIQUE + PARTIAL index on orders.paymentReference: one Paystack payment can only
+  // ever be used for ONE order, even if the same reference is sent twice at the same moment.
+  // "Partial" = the rule only covers orders that HAVE a paymentReference (text).
+  // Unpaid orders don't have one, so they don't count as duplicates of each other.
+  await db.collection('orders').createIndex(
+    { paymentReference: 1 },
+    { unique: true, partialFilterExpression: { paymentReference: { $type: 'string' } } }
+  );
 }
 
 // Returns the database so routes can use it, e.g. getDB().collection('lessons').

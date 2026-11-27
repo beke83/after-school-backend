@@ -7,6 +7,10 @@ const router = express.Router();         // a mini app that only holds routes
 const { getDB } = require('../db');      // our helper that gives us the connected database
 const { ObjectId } = require('mongodb'); // MongoDB's id type, used to find a lesson by _id
 
+// MARKED ROUTES: GET /lessons and PUT /lessons/:id are part of the coursework marking
+// and are demonstrated in Postman, so they stay PUBLIC (no login needed) on purpose.
+// The admin versions with login + validation are in routes/admin.js.
+
 // GET /lessons — send back every lesson as JSON
 router.get('/', async (req, res) => {    // async so we can use "await" for the database
     try {

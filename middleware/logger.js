@@ -11,6 +11,19 @@
 // If a middleware does not call next() (and does not send a response),
 // the request gets stuck and the browser waits forever.
 
+// Fields that must NEVER be printed: anyone who can read the logs (e.g. Render's Logs tab)
+// would otherwise see people's passwords and one-time codes in plain text.
+const SECRET_FIELDS = ['password', 'newPassword', 'code'];
+
+// Returns a copy of the body with the secret fields replaced by "***"
+function hideSecrets(body) {
+  const copy = { ...(body || {}) };          // copy, so the real req.body is not changed
+  for (const field of SECRET_FIELDS) {
+    if (copy[field] !== undefined) copy[field] = '***';
+  }
+  return copy;
+}
+
 function logger(req, res, next) {
   // Remember when the request arrived, so we can work out how long it took.
   const start = Date.now();
@@ -29,11 +42,10 @@ function logger(req, res, next) {
     console.log('[' + time + '] ' + req.method + ' ' + req.originalUrl +
       ' → ' + res.statusCode + ' (' + duration + 'ms)');
 
-    // For POST and PUT, also show the JSON body that was sent.
+    // For POST, PUT and PATCH, also show the JSON body that was sent (with secrets hidden).
     // By the time the response finishes, express.json() has already filled req.body.
-    // "|| {}" avoids printing "undefined" when no body was sent.
-    if (req.method === 'POST' || req.method === 'PUT') {
-      console.log('  Body: ' + JSON.stringify(req.body || {}));
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+      console.log('  Body: ' + JSON.stringify(hideSecrets(req.body)));
     }
   });
 
