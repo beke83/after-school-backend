@@ -8,6 +8,9 @@ require('dotenv').config();
 // Express is the web framework that handles HTTP requests and responses.
 const express = require('express');
 
+// Built into Node: builds file paths that work on Windows, Mac and Linux.
+const path = require('path');
+
 // Our own database helper (db.js): connectDB() opens the MongoDB connection.
 const { connectDB } = require('./db');
 
@@ -78,6 +81,26 @@ app.use(function (req, res, next) {
 // express.json() stops with a 400 error. The CORS headers must already be set by
 // then, otherwise the browser hides the 400 and shows a CORS error instead.
 app.use(express.json());
+
+// ---------------------------------------------------------------------------
+// Static file middleware: the lesson images
+// ---------------------------------------------------------------------------
+// The folder that holds the pictures, e.g. backend/public/images/maths.png.
+// __dirname is the folder this file (server.js) is in, so it works wherever the app runs.
+const imagesFolder = path.join(__dirname, 'public', 'images');
+
+// 1. express.static is Express's built-in STATIC FILE middleware. For any URL that
+//    starts with /images it looks for a file with that name in imagesFolder:
+//      GET /images/maths.png  →  sends backend/public/images/maths.png (Content-Type image/png)
+//    If there's no such file, it doesn't answer: it calls next() and the request moves on.
+//    It also refuses tricks like /images/../.env, so only files INSIDE the folder are sent.
+app.use('/images', express.static(imagesFolder));
+
+// 2. Only reached when express.static found no file: answer with a clear error message.
+//    404 = Not Found. req.path is the part after /images, e.g. "/unicorn.png".
+app.use('/images', function (req, res) {
+  res.status(404).json({ error: 'Image not found: ' + req.path.slice(1) });
+});
 
 // ---------------------------------------------------------------------------
 // Routes

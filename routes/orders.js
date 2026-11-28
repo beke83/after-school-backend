@@ -7,7 +7,7 @@ const router = express.Router();         // a mini app that only holds routes
 const crypto = require('crypto');        // built into Node: used for the random receipt key
 const { getDB } = require('../db');      // our helper that gives us the connected database
 const { ObjectId } = require('mongodb'); // MongoDB's id type, used for the lessons' _id
-const { getUserFromToken } = require('../middleware/auth'); // reads the login token (if any)
+const { getUserFromToken, requireAuth } = require('../middleware/auth'); // reads the login token
 const { checkOrderBody, OBJECT_ID_PATTERN } = require('../utils/orderChecks'); // shared field checks
 const { calculateOrder } = require('../utils/pricing');        // real prices from the DB
 const { verifyTransaction } = require('../utils/paystack');    // asks Paystack about a payment
@@ -173,6 +173,39 @@ router.post('/', async (req, res) => {
         }
         // calculateOrder's problems (unknown lesson, not enough spaces) carry status 400
         res.status(err.status || 500).json({ error: err.message });
+    }
+});
+
+// GET /orders/mine — the logged-in user's own orders, newest first.
+// Used by the "My account" page (account.html).
+// requireAuth runs first: no valid token → 401 "Please log in", and this never runs.
+// The filter { userId: req.user._id } means a user can only ever see THEIR orders:
+// the id comes from the session on the server, not from anything the browser sends.
+router.get('/mine', requireAuth, async (req, res) => {
+    try {
+        const orders = await getDB().collection('orders')
+            .find({ userId: req.user._id })     // only this user's orders
+            .sort({ createdAt: -1 })             // -1 = newest first
+            .toArray();                          // turn the results into a normal array
+
+        // Private data: tell the browser not to keep a copy (someone else might use
+        // this computer after the user logs out).
+        res.set('Cache-Control', 'no-store');
+
+        // Send only what the page shows. receiptKey is included because these are the
+        // user's own orders: the page uses it for the "Download receipt" links.
+        res.json(orders.map(order => ({
+            _id: order._id,
+            createdAt: order.createdAt,
+            items: order.items || [],            // older orders (before prices were saved) have none
+            totalGBP: order.totalGBP,
+            paymentStatus: order.paymentStatus || 'unpaid',
+            amountCharged: order.amountCharged,
+            currency: order.currency,
+            receiptKey: order.receiptKey
+        })));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

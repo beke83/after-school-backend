@@ -16,16 +16,25 @@ const router = express.Router();
 const { checkOrderBody } = require('../utils/orderChecks');      // same field checks as /orders
 const { calculateOrder } = require('../utils/pricing');          // real prices from the DB
 const { initializeTransaction } = require('../utils/paystack');  // starts a Paystack payment
+const { getUserFromToken } = require('../middleware/auth');      // reads the login token (if any)
+
+// Paystack needs an email on every payment, but the brief's checkout only asks for a name
+// and a phone. When the customer leaves the email empty, this stand-in address is given to
+// Paystack instead. example.com is reserved for examples, so nothing is ever delivered there.
+const GUEST_EMAIL = process.env.PAYSTACK_GUEST_EMAIL || 'guest@example.com';
 
 // POST /payments/initialize
-// Body: { name, phone, email, lessonIDs: [...], spaces: [...] }   (countryCode optional)
+// Body: { name, phone, lessonIDs: [...], spaces: [...] }   (email and countryCode optional)
 // Answer: { accessCode, reference, totalGBP, amountCharged, currency }
+//
+// LOGIN IS OPTIONAL (like POST /orders): guests can pay. If a valid token is sent, the
+// user's id goes into the Paystack metadata, and POST /orders links the order to the account.
 router.post('/initialize', async (req, res) => {
     const body = req.body || {};
     const { name, phone, email, lessonIDs, spaces } = body;
 
-    // 1. Same checks as POST /orders, but the email is REQUIRED (Paystack needs one)
-    const problem = checkOrderBody(body, true);
+    // 1. Same checks as POST /orders (name letters only, phone digits only, email optional)
+    const problem = checkOrderBody(body, false);
     if (problem) {
         return res.status(400).json({ error: problem });
     }
@@ -34,14 +43,17 @@ router.post('/initialize', async (req, res) => {
         // 2. The real total, worked out on the server (400 if a lesson is missing or full)
         const pricing = await calculateOrder(lessonIDs, spaces);
 
+        // Logged in? { user, token } or null for a guest (only used for the metadata)
+        const login = await getUserFromToken(req);
+
         // 3. Ask Paystack to start a payment for exactly that amount.
         //    metadata is saved by Paystack with the payment, so it shows in the Paystack
         //    dashboard what the payment was for.
         const payment = await initializeTransaction({
-            email: email,
+            email: email || GUEST_EMAIL,         // the customer's email, or the stand-in
             amountInSubunits: pricing.amountInSubunits,
             currency: pricing.currency,
-            metadata: { name, phone, lessonIDs, spaces }
+            metadata: { name, phone, lessonIDs, spaces, userId: login ? String(login.user._id) : null }
         });
 
         res.json({

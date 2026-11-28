@@ -45,8 +45,8 @@ backend/
 │   └── auth.js          requireAuth (Bearer token → req.user) and requireAdmin
 ├── routes/
 │   ├── lessons.js       GET /lessons, PUT /lessons/:id
-│   ├── orders.js        POST /orders (checks Paystack payments, emails the receipt), GET /orders/:id/receipt
-│   ├── payments.js      POST /payments/initialize (starts a Paystack test payment)
+│   ├── orders.js        POST /orders (checks Paystack payments, emails the receipt), GET /orders/mine, GET /orders/:id/receipt
+│   ├── payments.js      POST /payments/initialize (starts a Paystack test payment, login optional)
 │   ├── search.js        GET /search?q=
 │   ├── teachers.js      GET /teachers, GET /teachers/:id/lessons
 │   ├── enrolment.js     GET /enrolment/:lessonid
@@ -55,7 +55,7 @@ backend/
 ├── scripts/
 │   ├── seed.js          Resets the database: 12 lessons and 4 teachers
 │   └── create-admin.js  Creates/updates the admin account from ADMIN_EMAIL / ADMIN_PASSWORD
-├── public/images/       Lesson images
+├── public/images/       The 12 lesson images (maths.png …), served at /images/<name>
 ├── postman/             Exported Postman collection
 └── exports/             Exported MongoDB collections
 ```
@@ -106,11 +106,13 @@ All responses are JSON. Ids are MongoDB `_id` values (24 hex characters).
 | Method | Path | Body | Example response |
 |---|---|---|---|
 | GET | `/` | — | `{ "message": "After School API running" }` |
+| GET | `/images/:file` | — | The lesson picture, e.g. `/images/maths.png` (static file middleware). A missing file → `404` `{ "error": "Image not found: unicorn.png" }` |
 | GET | `/lessons` | — | `[ { "_id": "6560f1…", "topic": "Maths", "location": "Hendon", "price": 100, "space": 5, "icon": "fa-solid fa-calculator", "image": "maths.png" }, … ]` |
 | PUT | `/lessons/:id` | Any field(s) to change, e.g. `{ "space": 3 }` | `{ "message": "Lesson updated", "modified": 1 }` |
 | POST | `/orders` | `{ "name": "Jane Doe", "phone": "07123456789", "lessonIDs": ["6560f1…", "6560f2…"], "spaces": [2, 1] }`. Login is optional: send `Authorization: Bearer <token>` to link the order to your account. Optional: `email`, `countryCode` (`"+44"`), `paymentReference` (from Paystack). Prices come from the database; each lesson must exist and have enough spaces (`400` otherwise). With `paymentReference` the payment is checked with Paystack (success, exact amount, currency, not used before → `409`). | `201` `{ "message": "Order created", "orderId": "6561a0…", "paymentStatus": "unpaid", "totalGBP": 280, "receiptKey": "…", "emailSent": false }` |
+| GET | `/orders/mine` | Header `Authorization: Bearer <token>` (login required) | The logged-in user's orders, newest first: `[{ "_id", "createdAt", "items", "totalGBP", "paymentStatus", "amountCharged", "currency", "receiptKey" }]`. `401` without a login. |
 | GET | `/orders/:id/receipt?key=<receiptKey>` | — | The PDF receipt (`application/pdf`). `404` if the key is wrong. |
-| POST | `/payments/initialize` | `{ "name": "Jane Doe", "phone": "07123456789", "email": "jane@example.com", "lessonIDs": ["6560f1…"], "spaces": [2] }` | `{ "accessCode": "…", "reference": "…", "totalGBP": 200, "amountCharged": 400000, "currency": "NGN" }` |
+| POST | `/payments/initialize` | Login optional. `email` optional (Paystack is given `guest@example.com` when it's missing). `{ "name": "Jane Doe", "phone": "07123456789", "email": "jane@example.com", "lessonIDs": ["6560f1…"], "spaces": [2] }` | `{ "accessCode": "…", "reference": "…", "totalGBP": 200, "amountCharged": 400000, "currency": "NGN" }` |
 | GET | `/search?q=term` | — | Lessons whose topic, location, price or space contains `term` (ignores case). An empty `q` returns all lessons. `[ { "_id": "6560f1…", "topic": "Maths", … } ]` |
 | GET | `/teachers` | — | `[ { "_id": "6560f9…", "firstName": "Sarah", "lastName": "Ahmed", "lessonIDs": ["6560f1…", …] }, … ]` |
 | GET | `/teachers/:id/lessons` | — | The teacher's lessons: `[ { "_id": "6560f1…", "topic": "Maths", … }, … ]` |

@@ -24,7 +24,8 @@ function checkOrderBody(body, emailRequired) {
         return 'Phone must contain numbers only';
     }
 
-    // email: required for a payment (Paystack needs it), optional for a plain order.
+    // email: optional everywhere now (the brief's checkout only needs name + phone);
+    // emailRequired is kept so a route could still insist on one.
     // If it IS sent, it must look like an email.
     if (email === undefined) {
         if (emailRequired) return 'Email is required';
